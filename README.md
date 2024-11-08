@@ -6,3 +6,7 @@ are most likely unable to make payment due given date.
 ## Solutions
 I did the task with 3 different methods; correlation (matrix) table, linear model and neural network. 
 All solutions and its results are explained and presented in html file, which was made with Quarto. 
+
+## Picture of html file
+![Screenshot 2024-11-08 at 13 03 00](https://github.com/user-attachments/assets/87fff4c7-ec77-4858-b37e-062275cb906c)
+
