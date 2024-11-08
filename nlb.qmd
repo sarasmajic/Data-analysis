@@ -1,0 +1,106 @@
+---
+title-block-banner: true
+title-block-banner-color: rgb(173, 216, 210);
+title: "Analiza in predikcija neplačnikov kreditov in posojil"
+author: "Sara Smajič"
+date: "10/14/2024"
+format:
+  html:
+    self-contained: true
+    code-fold: true
+    theme: moon
+    backgroundcolor: rgb(245,245,220);
+    
+jupyter: python3
+---
+
+## Naloga
+Podanih imamo 12 različnih spremenljivk. Naša naloga je poiskati korelacijo med spremenljivko "DlqIn2Years", kar pomeni, da je stranka zamujala ali pa sploh ni plačala kredita/posojila. Tako s številkami kot tudi z logičnimi povezavami poskušamo ugotoviti katere spremenljivke vplivajo na našo ciljno - odvisno spremenljivko. 
+
+## Reševanje naloge
+Nalogo sem rešila s tremi priljubljenimi modeli, ki se pogosto uporabljajo pri analizi podatkov. Izrisala sem korelacijsko matriko in naučila oz. prilagodila linearni model ter natrenirala nevronsko mrežo. Te pa so bolj podrobno opisane v nadaljevanju. 
+
+## Korelacijska tabela
+Kot že prej omenjeno, izračunala sem korelacijsko tabelo katera vrne korelacijske koeficiente, ki so kazalniki povezav med dvema spremenljivkama, njegov interval pa je med -1 in 1. 
+
+-1 je popolna negativna korelacija (ko se ena spremenljivka povečuje, se druga zmanjšuje), 0 pomeni, da korelacije ni in 1, da je popolna pozitivna korelacija(ko se ena spremenljivka povečuje, se tudi druga).
+
+Izris ne pokaže samo številčno, ampak tudi vizualno - tam kjer je temnejše polje, večji je koeficient in tam kjer je svetlejše, manjši je. Temnejše obarvani oz. pozitivni so: "NoOfTime35-65DaysPastDueNotWorse", "NoOfTimes90DaysLate", "NoOfTime60-89DaysPastDueNotWorse".
+
+```{python}
+#| label: fig-polar
+#| fig-cap: "Korelacijska matrika"
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from sklearn import linear_model
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
+from sklearn.neural_network import MLPRegressor
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.preprocessing import StandardScaler
+
+
+df = pd.read_csv("cs-data.csv")
+
+corr_mat = round(df.corr(), 2)
+
+positive_corr = corr_mat
+sns.heatmap(positive_corr, annot =True, cmap='Blues', mask = positive_corr.isnull())
+plt.show() #vizualizacija matrike
+```
+
+## Linearni model
+Pri linearnih modelih sem vzela vse podatke, ki so bili na voljo, razen vrstic, ki je imela vsaj en manjkajoč podatek (NA), ignorirala pa sem tudi spremenljivki ClientID in DlqIn2Years; ena ni relevantna, drugo pa v resnici iščemo. Linearni model nazaj vrne koeficiente, večji kot pa so, boljšo oz. močnejšo povezavo imajo. Vrne nam tudi MSE (mean sqaured error), ki je izjemno majhen (0.069), kar pomeni, da je model precej natančen. Gre se za podoben koncept kot pri korelacijski tabeli. Grafa pa žal ne moremo izrisati, saj je večdimenzionalen. 
+
+Največji rezulati so 3, 7 in 9 podatek, torej "NoOfTime35-65DaysPastDueNotWorse", "NoOfTimes90DaysLate", "NoOfTime60-89DaysPastDueNotWorse".
+
+```{python}
+#| label: fig-bar
+#| fig-cap: "Koeficienti linearnega modela"
+df = df.dropna(axis=0, how='any')
+x = df.iloc[:,2:].values
+y = df.iloc[:, 1].values
+
+print(x.shape)
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2, random_state = 0)
+scaler = StandardScaler() 
+x_train = scaler.fit_transform(x_train)  
+x_test = scaler.transform(x_test) 
+
+lin_reg = linear_model.LinearRegression()
+lin_reg.fit(x_train, y_train)
+
+lin_reg_pred = lin_reg.predict(x_test)
+print("Coefficients:\n", lin_reg.coef_)
+print("Intercept:\n", lin_reg.intercept_)
+
+print("Mean squared error: %.2f" % mean_squared_error(y_test, lin_reg_pred))
+#print(corr_mat) matrika
+```
+
+
+## Nevronske mreže
+V knjižnici sklearn sem poskusila natrenirati nevronsko mrežo, ki bi napovedala naš y. Mreža ni najbolj zanesljiva, saj so njene napake prevelike, je pa tudi eden izmed načinov, s katerim se da problem rešiti. 
+
+```{python}
+#| label: fig-scatter
+#| fig-cap: "Analiza nevronske mreže"
+
+mlp = MLPClassifier(hidden_layer_sizes=(8,8), activation="relu", solver="adam")
+mlp.fit(x_train, y_train)
+
+predict_train = mlp.predict(x_train)
+predict_test = mlp.predict(x_test)
+
+print(confusion_matrix(y_train, predict_train))
+print(classification_report(y_train, predict_train))
+```
+
+## Ugotovitve
+S pomočjo matrike sem prišla sem do zaključka, da spremenljivke, ki najbolj vplivajo na "DlqIn2Years" so "NoOfTime35- 65DaysPastDueNotWorse", "NoOfTimes90DaysLate" in "NoOfTime60- 89DaysPastDueNotWorse", kar pomeni, da ima stranka zgodovino neplačevanja, to pa je lahko indikator, da je večja verjetnost, da oseba ne bo izpolnjevala svojih finančnih obveznosti na čas. Moj sklep je potrdil še linearni model, ki je pokazal iste rezultate. Kar je zanimivo, so rezultati za "AgeInYears". Meni osebno je bolj logično, da bi mlajši posojilojemalci zamujali s plačili, vendar negativen koeficient namiguje drugače.  
+
